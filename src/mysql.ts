@@ -57,21 +57,36 @@ class MySQL {
 
   public async migrateAllTables(): Promise<void> {
     const tables = await this.fetchTables();
-    tables.forEach((element: any) => {
-      console.log('Table name: ', element.TABLE_NAME);
+
+    tables.forEach(async (element: any) => {
+      const table = element.TABLE_NAME;
+      const columns = await this.fetchColumns(table);
     });
   }
 
   private async fetchTables(): Promise<string[]> {
     const query = `SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_TYPE='BASE TABLE' AND TABLE_SCHEMA='${this.database}'`;
-    let data = [];
+    let tables = [];
 
     try {
-      data = await this.promosifiedQuery(query);
+      tables = await this.promosifiedQuery(query);
     } catch (error: any /* TODO figure out how to give this a type */) {
       console.log('Error while fetching tables');
       console.log(error.message);
     }
-    return data;
+    return tables;
+  }
+
+  private async fetchColumns(tableName: string): Promise<void> {
+    const query = `SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='${this.database}' AND TABLE_NAME='${tableName}'`;
+    let columns = [];
+
+    try {
+      columns = await this.promosifiedQuery(query);
+    } catch (error: any /* TODO figure out how to give this a type */) {
+      console.log('Error while fetching columns');
+      console.log(error.message);
+    }
+    return columns;
   }
 }
