@@ -8,7 +8,7 @@ interface ConnectionParams {
   database: string;
 }
 
-class MySQL {
+export class MySQL {
   private host: string;
   private port: number;
   private user: string;
@@ -25,6 +25,8 @@ class MySQL {
     this.password = password;
     this.database = database;
     this.connectToMySQL();
+    //promisifying query for later use
+    this.promosifiedQuery = promisify(this.connection.query).bind(this.connection);
   }
 
   destructor() {
@@ -50,18 +52,18 @@ class MySQL {
 
       console.log('Successfully connected to MySQL');
     });
-
-    //promisifying query for later use
-    this.promosifiedQuery = promisify(this.connection.query).bind(this.connection);
   }
 
-  public async migrateAllTables(): Promise<void> {
+  public async fetchAllData(): Promise<{ table: string; columns: string[]; data: string[] }[]> {
     const tables = await this.fetchTables();
 
-    tables.forEach(async (element: any) => {
-      const table = element.TABLE_NAME;
-      const columns = await this.fetchColumns(table);
-    });
+    return await Promise.all(
+      tables.map(async (element: any) => {
+        const table: string = element.TABLE_NAME;
+        const [columns, data] = await Promise.all([this.fetchColumns(table), this.fetchTableData(table)]);
+        return { table, columns, data };
+      }),
+    );
   }
 
   private async fetchTables(): Promise<string[]> {
@@ -69,7 +71,8 @@ class MySQL {
     let tables = [];
 
     try {
-      tables = await this.promosifiedQuery(query);
+      //JSON.parse and JSON.stringify are used to remove the ROW_DATA_PACKET text returned from MySQL
+      tables = JSON.parse(JSON.stringify(await this.promosifiedQuery(query)));
     } catch (error: any /* TODO figure out how to give this a type */) {
       console.log('Error while fetching tables');
       console.log(error.message);
@@ -77,16 +80,32 @@ class MySQL {
     return tables;
   }
 
-  private async fetchColumns(tableName: string): Promise<void> {
+  private async fetchColumns(tableName: string): Promise<string[]> {
     const query = `SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='${this.database}' AND TABLE_NAME='${tableName}'`;
     let columns = [];
 
     try {
-      columns = await this.promosifiedQuery(query);
+      //JSON.parse and JSON.stringify are used to remove the ROW_DATA_PACKET text returned from MySQL
+      columns = JSON.parse(JSON.stringify(await this.promosifiedQuery(query)));
     } catch (error: any /* TODO figure out how to give this a type */) {
       console.log('Error while fetching columns');
       console.log(error.message);
     }
     return columns;
+  }
+
+  private async fetchTableData(table: string): Promise<string[]> {
+    const query = `SELECT * FROM ${table}`;
+    let data = [];
+
+    try {
+      //JSON.parse and JSON.stringify are used to remove the ROW_DATA_PACKET text returned from MySQL
+      data = JSON.parse(JSON.stringify(await this.promosifiedQuery(query)));
+    } catch (error: any /* TODO figure out how to give this a type */) {
+      console.log('Error while fetching data from table: ', table);
+      console.log(error.message);
+    }
+
+    return data;
   }
 }
