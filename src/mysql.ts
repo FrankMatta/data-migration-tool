@@ -1,32 +1,20 @@
 import { Connection, createConnection } from 'mysql';
 import { promisify } from 'util';
-interface ConnectionParams {
-  host: string;
-  port: number;
-  user: string;
-  password: string;
-  database: string;
-}
+import { MySQLConnectionParams } from './interfaces/connections-params';
 
-export class MySQL {
-  private host: string;
-  private port: number;
-  private user: string;
-  private password: string;
-  private database: string;
+export class MySQL extends MySQLConnectionParams {
   private connection!: Connection;
-  private promosifiedQuery: any; // TODO figure out how to give this a type
+  private promosifiedQuery: any;
 
-  constructor(connection: ConnectionParams) {
-    const { host, port, user, password, database } = connection;
-    this.host = host;
-    this.port = port;
-    this.user = user;
-    this.password = password;
+  constructor(connectionParams: MySQLConnectionParams) {
+    super();
+    const { database } = connectionParams;
     this.database = database;
-    this.connectToMySQL();
-    //promisifying query for later use
-    this.promosifiedQuery = promisify(this.connection.query).bind(this.connection);
+    this.connectToMySQL(connectionParams);
+
+    this.promosifiedQuery = promisify(this.connection.query).bind(
+      this.connection,
+    );
   }
 
   destructor() {
@@ -35,49 +23,55 @@ export class MySQL {
     }
   }
 
-  private connectToMySQL(): void {
+  private connectToMySQL(connectionParams: MySQLConnectionParams): void {
+    const { host, port, user, password, database, ssl } = connectionParams;
     this.connection = createConnection({
-      host: this.host,
-      port: this.port,
-      user: this.user,
-      password: this.password,
-      database: this.database,
+      host,
+      port,
+      user,
+      password,
+      database,
+      ssl,
     });
-
     this.connection.connect(function (error) {
       if (error) {
-        console.error('error connecting to MySQL: ' + error.message);
-        return;
+        console.error('Error connecting to MySQL: ' + error.message);
+        process.exit(1);
       }
-
       console.log('Successfully connected to MySQL');
     });
   }
 
-  public async fetchAllData(): Promise<{ table: string; columns: string[]; data: string[] }[]> {
+  public async fetchAllData(): Promise<
+    { table: string; columns: string[]; data: string[] }[]
+  > {
     const tables = await this.fetchTables();
 
     return await Promise.all(
       tables.map(async (element: any) => {
         const table: string = element.TABLE_NAME;
-        const [columns, data] = await Promise.all([this.fetchColumns(table), this.fetchTableData(table)]);
+        const [columns, data] = await Promise.all([
+          this.fetchColumns(table),
+          this.fetchTableData(table),
+        ]);
         return { table, columns, data };
       }),
     );
   }
 
-  private async fetchTables(): Promise<string[]> {
+  private async fetchTables(): Promise<{ TABLE_NAME: string }[]> {
     const query = `SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_TYPE='BASE TABLE' AND TABLE_SCHEMA='${this.database}'`;
-    let tables = [];
+    let tables: { TABLE_NAME: string }[] = [];
 
     try {
+      tables = await this.promosifiedQuery(query);
       //JSON.parse and JSON.stringify are used to remove the ROW_DATA_PACKET text returned from MySQL
-      tables = JSON.parse(JSON.stringify(await this.promosifiedQuery(query)));
-    } catch (error: any /* TODO figure out how to give this a type */) {
-      console.log('Error while fetching tables');
-      console.log(error.message);
+      tables = JSON.parse(JSON.stringify(tables));
+      return tables;
+    } catch (error: any) {
+      console.error('Error while fetching tables: ', error.message);
+      process.exit(1);
     }
-    return tables;
   }
 
   private async fetchColumns(tableName: string): Promise<string[]> {
@@ -85,11 +79,12 @@ export class MySQL {
     let columns = [];
 
     try {
+      columns = await this.promosifiedQuery(query);
       //JSON.parse and JSON.stringify are used to remove the ROW_DATA_PACKET text returned from MySQL
-      columns = JSON.parse(JSON.stringify(await this.promosifiedQuery(query)));
-    } catch (error: any /* TODO figure out how to give this a type */) {
-      console.log('Error while fetching columns');
-      console.log(error.message);
+      columns = JSON.parse(JSON.stringify(columns));
+    } catch (error: any) {
+      console.error('Error while fetching columns: ', error.message);
+      process.exit(1);
     }
     return columns;
   }
@@ -99,11 +94,13 @@ export class MySQL {
     let data = [];
 
     try {
+      data = await this.promosifiedQuery(query)
       //JSON.parse and JSON.stringify are used to remove the ROW_DATA_PACKET text returned from MySQL
-      data = JSON.parse(JSON.stringify(await this.promosifiedQuery(query)));
-    } catch (error: any /* TODO figure out how to give this a type */) {
-      console.log('Error while fetching data from table: ', table);
-      console.log(error.message);
+      data = JSON.parse(JSON.stringify(data));
+    } catch (error: any) {
+      console.error('Error while fetching data from table: ', table);
+      console.error(error.message);
+      process.exit(1);
     }
 
     return data;

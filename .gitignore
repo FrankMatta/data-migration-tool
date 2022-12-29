@@ -1,5 +1,5 @@
-.gitignore
+# Dependency directories
 node_modules
-package-lock.json
+
 code.php
 *.env*
