@@ -2,9 +2,9 @@ import { Connection, createConnection } from 'mysql';
 import { promisify } from 'util';
 import { GenericType } from './interfaces/common.interface';
 import { MySQLConnectionParams } from './interfaces/connection-params';
+
 /**
- * Class that does MySQL operations
- * @param MySQLConnectionParams
+ * MySQL class responsible for all the operations inside MySQL database
  */
 export class MySQL extends MySQLConnectionParams {
   private connection!: Connection;
@@ -28,8 +28,9 @@ export class MySQL extends MySQLConnectionParams {
   }
 
   /**
-   * Function to connect to MySQL
+   * Connect to MySQL database
    * @param connectionParams
+   * @returns void
    */
   connectToMySQL(connectionParams: MySQLConnectionParams): void {
     const { host, port, user, password, database, ssl } = connectionParams;
@@ -49,15 +50,23 @@ export class MySQL extends MySQLConnectionParams {
       console.log('Successfully connected to MySQL');
     });
   }
-
+  /**
+   * This function will be called externally to fetch all the data from the database
+   * @param table
+   * @param columns
+   *
+   * @returns Promise<{ table: string; columns: string[]; data: GenericType[] }[]>
+   */
   async fetchAllData(): Promise<
     { table: string; columns: string[]; data: GenericType[] }[]
   > {
     const tables = await this.fetchTables();
-
+    
     return await Promise.all(
+      //fetching data of each column in every table
       tables.map(async (element: any) => {
         const table: string = element.TABLE_NAME;
+        //grabbing the columns and data from the called functions
         const [columns, data] = await Promise.all([
           this.fetchColumns(table),
           this.fetchTableData(table),
@@ -66,7 +75,10 @@ export class MySQL extends MySQLConnectionParams {
       }),
     );
   }
-
+  /**
+   * This function will be called internally to fetch all the tables from the database
+   * @returns Promise<{ TABLE_NAME: string }[]>
+   */
   async fetchTables(): Promise<{ TABLE_NAME: string }[]> {
     const query = `SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_TYPE='BASE TABLE' AND TABLE_SCHEMA='${this.database}'`;
     let tables: { TABLE_NAME: string }[] = [];
@@ -82,6 +94,12 @@ export class MySQL extends MySQLConnectionParams {
     }
   }
 
+  /**
+   * This function will be called internally to fetch all the columns of a
+   * certain table from the database
+   * @param tableName
+   * @returns Promise<string[]>
+   */
   async fetchColumns(tableName: string): Promise<string[]> {
     const query = `SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='${this.database}' AND TABLE_NAME='${tableName}'`;
     let columns = [];
@@ -97,12 +115,18 @@ export class MySQL extends MySQLConnectionParams {
     return columns;
   }
 
+  /**
+   * This function will be called internally to fetch all the data of a
+   * certain table
+   * @param table
+   * @returns Promise<string[]>
+   */
   async fetchTableData(table: string): Promise<string[]> {
     const query = `SELECT * FROM ${table}`;
     let data = [];
 
     try {
-      data = await this.promosifiedQuery(query)
+      data = await this.promosifiedQuery(query);
       //JSON.parse and JSON.stringify are used to remove the ROW_DATA_PACKET text returned from MySQL
       data = JSON.parse(JSON.stringify(data));
     } catch (error: any) {

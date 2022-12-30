@@ -12,6 +12,9 @@ type JSONValue =
   | Array<JSONValue>
   | null;
 
+/**
+ * Generic type for data returns
+ */
 export type GenericType =
   | string
   | number

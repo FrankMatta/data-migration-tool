@@ -12,5 +12,9 @@
     "strict": true,
     "noImplicitAny": true,
     "skipLibCheck": true
+  },
+  "typedocOptions": {
+    "entryPoints": ["src/mysql.ts"],
+    "out": "docs"
   }
 }
