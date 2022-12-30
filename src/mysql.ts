@@ -1,7 +1,11 @@
 import { Connection, createConnection } from 'mysql';
 import { promisify } from 'util';
-import { MySQLConnectionParams } from './interfaces/connections-params';
-
+import { GenericType } from './interfaces/common.interface';
+import { MySQLConnectionParams } from './interfaces/connection-params';
+/**
+ * Class that does MySQL operations
+ * @param MySQLConnectionParams
+ */
 export class MySQL extends MySQLConnectionParams {
   private connection!: Connection;
   private promosifiedQuery: any;
@@ -23,7 +27,11 @@ export class MySQL extends MySQLConnectionParams {
     }
   }
 
-  private connectToMySQL(connectionParams: MySQLConnectionParams): void {
+  /**
+   * Function to connect to MySQL
+   * @param connectionParams
+   */
+  connectToMySQL(connectionParams: MySQLConnectionParams): void {
     const { host, port, user, password, database, ssl } = connectionParams;
     this.connection = createConnection({
       host,
@@ -42,8 +50,8 @@ export class MySQL extends MySQLConnectionParams {
     });
   }
 
-  public async fetchAllData(): Promise<
-    { table: string; columns: string[]; data: string[] }[]
+  async fetchAllData(): Promise<
+    { table: string; columns: string[]; data: GenericType[] }[]
   > {
     const tables = await this.fetchTables();
 
@@ -59,7 +67,7 @@ export class MySQL extends MySQLConnectionParams {
     );
   }
 
-  private async fetchTables(): Promise<{ TABLE_NAME: string }[]> {
+  async fetchTables(): Promise<{ TABLE_NAME: string }[]> {
     const query = `SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_TYPE='BASE TABLE' AND TABLE_SCHEMA='${this.database}'`;
     let tables: { TABLE_NAME: string }[] = [];
 
@@ -74,7 +82,7 @@ export class MySQL extends MySQLConnectionParams {
     }
   }
 
-  private async fetchColumns(tableName: string): Promise<string[]> {
+  async fetchColumns(tableName: string): Promise<string[]> {
     const query = `SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='${this.database}' AND TABLE_NAME='${tableName}'`;
     let columns = [];
 
@@ -89,7 +97,7 @@ export class MySQL extends MySQLConnectionParams {
     return columns;
   }
 
-  private async fetchTableData(table: string): Promise<string[]> {
+  async fetchTableData(table: string): Promise<string[]> {
     const query = `SELECT * FROM ${table}`;
     let data = [];
 
