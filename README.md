@@ -1,6 +1,4 @@
-# Project Title
-
-Data Migration Tool
+# Data Migration Tool
 
 ## Description
 
